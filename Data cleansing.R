@@ -101,6 +101,118 @@ if (unit == "ft" ){
 unit <- "m"
 unit
 
-apply(data=myproject,1,function(x),sum(is.na(x)))
+# 3.2.2 Deductive correction
+## correctRounding function 
+library(deducorrect)
+e <- editmatrix("x + y == z")
+d <- data.frame(x = 100, y = 101, z = 200)
+cor <- correctRounding(e, d)
+cor$corrected
+cor$corrections
+# The function correctSigns is able to detect and repair sign errors
+e <- editmatrix("x + y == z")
+d <- data.frame(x = 100, y = -100, z = 200)
+cor <- correctSigns(e, d)
+cor$corrected
+cor$corrections
+# Function correctTypos is capable of detecting and correcting typographic errors in numbers
+e <- editmatrix("x + y == z")
+d <- data.frame(x = 123, y = 132, z = 246)
+cor <- correctTypos(e, d)
+cor$corrected
+cor$corrections
 
+## 3.2.3 Deterministic imputation
+E <- editmatrix(expression(
+  staff + cleaning + housing == total,
+  staff >= 0,
+  housing >= 0,
+  cleaning >= 0
+))
+dat <- data.frame(
+  staff = c(100,100,100),
+  housing = c(NA,50,NA),
+  cleaning = c(NA,NA,NA),
+  total = c(100,180,NA)
+)
+dat
+cor <- deduImpute(E,dat)
+cor$corrected
+#### similar situations exist for categorical data, which are handled by deduImpute as well
+E <- editarray(expression(
+  age %in% c("adult","under-aged"),
+  driverslicense %in% c(TRUE, FALSE),
+  if ( age == "under-aged" ) !driverslicense
+))
+dat <- data.frame(
+  age = NA,
+  driverslicense = TRUE
+)
+dat
+cor <- deduImpute(E,dat)
+cor$corrected
 
+#### IMPUTATION
+# 3.3.1 Basic numeric imputation
+library(Hmisc)
+x <- impute(x, fun = mean) # mean imputation
+x
+x <- impute(x, fun = median) # median imputation
+x
+# linear regression models
+data(iris)
+iris$Sepal.Length[1:10] <- NA
+model <- lm(Sepal.Length ~ Sepal.Width + Petal.Width, data = iris)
+model
+I <- is.na(iris$Sepal.Length)
+I
+iris$Sepal.Length[I] <- predict(model, newdata = iris[I, ])
+iris$Sepal.Length[I]
+# Hot deck imputation
+# random hot-deck imputation
+data("women")
+head(women)
+women
+height <- women$height
+height[c(6, 9)] <- NA
+height
+(height <- impute(height, "random"))
+# sequential hot-deck imputation
+# x : vector to be imputed
+# last : value to use if last value of x is empty
+seqImpute <- function(x,last){
+  n <- length(x)
+  x <- c(x,last)
+  i <- is.na(x)
+  while(any(i)){
+    x[i] <- x[which(i) + 1]
+    i <- is.na(x)
+  }
+  x[1:n]
+}
+
+# Example of kNN imputation
+library(VIM)
+data(iris)
+n <- nrow(iris)
+n
+## provide some empty values (10 in each column, randomly)
+for (i in 1:ncol(iris)) {
+  iris[sample(1:n, 10, replace = FALSE), i] <- NA
+}
+iris2 <- kNN(iris)
+iris2
+
+### Minimal value adjustment
+library(editrules)
+library(rspa)
+E <- editmatrix(expression(x + y == z, x >= 0, y >= 0))
+E
+d <- data.frame(x = 10, y = 10, z = 21)
+d
+d1 <- adjustRecords(E, d)
+d1
+d1$adjusted
+violatedEdits(E, d1$adjusted, tol = 0.01)
+A <- array(c(x = FALSE, y = FALSE, z = TRUE), dim = c(1, 3))
+A
